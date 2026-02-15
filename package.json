@@ -1,0 +1,13 @@
+{
+  "name": "customer-proposal-generator",
+  "version": "1.0.0",
+  "description": "顧客情報から提案資料を自動生成するWebアプリ",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

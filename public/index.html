@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>提案資料ジェネレーター</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ヘッダー -->
+    <header class="header">
+      <h1>提案資料ジェネレーター</h1>
+      <p>顧客情報を入力して、プロフェッショナルな提案資料を自動生成</p>
+    </header>
+
+    <main class="main">
+      <!-- 入力フォーム -->
+      <section class="form-section" id="formSection">
+        <div class="card">
+          <h2>顧客情報</h2>
+          <form id="customerForm">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="companyName">会社名 <span class="required">*</span></label>
+                <input type="text" id="companyName" required placeholder="例: 株式会社サンプル">
+              </div>
+              <div class="form-group">
+                <label for="industry">業界</label>
+                <select id="industry">
+                  <option value="">選択してください</option>
+                  <option value="製造">製造</option>
+                  <option value="小売">小売</option>
+                  <option value="金融">金融</option>
+                  <option value="医療">医療</option>
+                  <option value="教育">教育</option>
+                  <option value="IT">IT</option>
+                  <option value="建設">建設</option>
+                  <option value="物流">物流</option>
+                  <option value="飲食">飲食</option>
+                  <option value="不動産">不動産</option>
+                  <option value="その他">その他</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="department">部署名</label>
+                <input type="text" id="department" placeholder="例: 情報システム部">
+              </div>
+              <div class="form-group">
+                <label for="contactName">担当者名</label>
+                <input type="text" id="contactName" placeholder="例: 山田 太郎">
+              </div>
+              <div class="form-group">
+                <label for="employeeCount">従業員数</label>
+                <select id="employeeCount">
+                  <option value="">選択してください</option>
+                  <option value="1〜50">1〜50名</option>
+                  <option value="51〜200">51〜200名</option>
+                  <option value="201〜500">201〜500名</option>
+                  <option value="501〜1000">501〜1,000名</option>
+                  <option value="1001〜5000">1,001〜5,000名</option>
+                  <option value="5001以上">5,001名以上</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="budget">予算規模</label>
+                <input type="text" id="budget" placeholder="例: 500万円〜1,000万円">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="projectName">プロジェクト名</label>
+              <input type="text" id="projectName" placeholder="例: 基幹システム刷新プロジェクト">
+            </div>
+
+            <div class="form-group">
+              <label for="challenges">課題・要望（改行区切りで複数入力可）</label>
+              <textarea id="challenges" rows="4" placeholder="例:&#10;既存システムの老朽化&#10;業務効率の改善&#10;データの一元管理"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="timeline">希望納期</label>
+              <input type="text" id="timeline" placeholder="例: 2026年9月末">
+            </div>
+
+            <div class="form-group">
+              <label for="templateId">提案テンプレート <span class="required">*</span></label>
+              <div class="template-cards" id="templateCards">
+                <!-- テンプレートカードはJSで動的に生成 -->
+              </div>
+              <input type="hidden" id="templateId" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="generateBtn">
+              提案資料を生成
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- プレビュー -->
+      <section class="preview-section" id="previewSection" style="display:none;">
+        <div class="preview-toolbar">
+          <button class="btn btn-secondary" id="backBtn">入力に戻る</button>
+          <button class="btn btn-primary" id="downloadPdfBtn">PDFダウンロード</button>
+        </div>
+        <div class="proposal-preview" id="proposalPreview">
+          <!-- プレビュー内容はJSで動的に生成 -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
