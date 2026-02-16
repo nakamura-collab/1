@@ -1,0 +1,55 @@
+{{!--
+  Custom Template: Partners Detail
+  Description: BAK Partners Connect 2025風のパートナー詳細ページ
+  Usage: Ghostの管理画面でページを作成し、テンプレートから「Partners Detail」を選択
+--}}
+
+{{!< default}}
+
+<link rel="stylesheet" href="{{asset "css/partners-detail.css"}}">
+
+{{#post}}
+<article class="partners-detail">
+
+  {{!-- ヒーローセクション --}}
+  <section class="pd-hero">
+    <div class="pd-hero__inner">
+      {{#if tags}}
+      <div class="pd-hero__org">
+        {{#foreach tags}}
+          <span class="pd-hero__org-badge">{{name}}</span>
+        {{/foreach}}
+      </div>
+      {{/if}}
+
+      <h1 class="pd-hero__title">{{title}}</h1>
+
+      {{#if custom_excerpt}}
+      <p class="pd-hero__subtitle">{{custom_excerpt}}</p>
+      {{/if}}
+    </div>
+
+    {{#if feature_image}}
+    <div class="pd-hero__image">
+      <img src="{{feature_image}}" alt="{{#if feature_image_alt}}{{feature_image_alt}}{{else}}{{title}}{{/if}}" loading="lazy">
+    </div>
+    {{/if}}
+  </section>
+
+  {{!-- メインコンテンツ --}}
+  <div class="pd-content">
+    <div class="pd-content__inner">
+      {{content}}
+    </div>
+  </div>
+
+  {{!-- CTAセクション --}}
+  <section class="pd-cta">
+    <div class="pd-cta__inner">
+      <p class="pd-cta__text">共創パートナーを募集しています</p>
+      <a href="#apply" class="pd-cta__button">応募フォームへ</a>
+    </div>
+  </section>
+
+</article>
+{{/post}}
