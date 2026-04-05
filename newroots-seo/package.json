@@ -1,7 +1,8 @@
 {
   "name": "newroots-seo",
   "version": "1.0.0",
-  "description": "PlaywrightとClaude APIを使ったSEO分析ツール",
+  "description": "newroots.co.jp SEO自動分析ツール",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
