@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X発信改善ワークフロー</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="x-workflow.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header wf-header">
+      <div class="header-inner">
+        <div>
+          <h1>X発信改善ワークフロー</h1>
+          <p>投稿生成 → 結果分析 → 改善ループの3ステップで発信を磨く</p>
+        </div>
+        <a href="/" class="btn btn-secondary btn-sm">提案資料ジェネレーターへ</a>
+      </div>
+    </header>
+
+    <main class="main wf-main">
+
+      <!-- ステップインジケーター -->
+      <div class="step-indicator">
+        <div class="step-dot active" id="dot1">
+          <span class="dot-num">1</span>
+          <span class="dot-label">投稿生成</span>
+        </div>
+        <div class="step-line" id="line12"></div>
+        <div class="step-dot" id="dot2">
+          <span class="dot-num">2</span>
+          <span class="dot-label">結果分析</span>
+        </div>
+        <div class="step-line" id="line23"></div>
+        <div class="step-dot" id="dot3">
+          <span class="dot-num">3</span>
+          <span class="dot-label">改善ループ</span>
+        </div>
+      </div>
+
+      <!-- Step 1: 投稿生成 -->
+      <section class="wf-card" id="card1">
+        <div class="wf-card-header">
+          <div class="wf-step-badge">Step 1</div>
+          <h2>投稿案の生成</h2>
+        </div>
+        <div class="wf-card-body">
+          <div class="improvement-notice" id="improvementNotice" style="display:none;">
+            <span class="badge-improvement">前回の改善ルール適用中</span>
+            前回の改善ループで生成されたルールを反映して投稿案を作ります。
+          </div>
+          <button class="btn btn-primary wf-btn" id="generatePostsBtn">
+            投稿案を生成（Claude）
+          </button>
+          <div class="stream-area" id="stream1" style="display:none;"></div>
+          <div class="posts-area" id="postsArea" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- Step 2: 結果分析 -->
+      <section class="wf-card wf-card-locked" id="card2">
+        <div class="wf-card-header">
+          <div class="wf-step-badge">Step 2</div>
+          <h2>結果の入力・分析</h2>
+        </div>
+        <div class="wf-card-body">
+          <p class="wf-locked-msg" id="locked2">Step 1 を完了すると利用可能になります</p>
+          <div id="metricsArea" style="display:none;">
+            <p class="wf-hint">各投稿の数値を入力して分析します。投稿していない項目は空白のままでも構いません。</p>
+            <div id="metricsCards"></div>
+            <button class="btn btn-primary wf-btn" id="analyzeBtn">分析する（Claude）</button>
+            <div class="stream-area" id="stream2" style="display:none;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: 改善ループ -->
+      <section class="wf-card wf-card-locked" id="card3">
+        <div class="wf-card-header">
+          <div class="wf-step-badge">Step 3</div>
+          <h2>改善ルールの生成・保存</h2>
+        </div>
+        <div class="wf-card-body">
+          <p class="wf-locked-msg" id="locked3">Step 2 を完了すると利用可能になります</p>
+          <div id="improvementArea" style="display:none;">
+            <p class="wf-hint">分析結果をもとに、明日以降の投稿に使う改善ルールを生成します。</p>
+            <button class="btn btn-primary wf-btn" id="improveBtn">改善ルールを生成（Claude）</button>
+            <div class="stream-area" id="stream3" style="display:none;"></div>
+            <div id="saveImprovementArea" style="display:none;">
+              <button class="btn btn-save wf-btn" id="saveImprovementBtn">
+                明日の生成に保存する
+              </button>
+              <p class="save-note">保存すると、次回 Step 1 の生成時にこの改善ルールが自動的に反映されます。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- X 投稿モーダル（ワークフロー用） -->
+  <div class="modal-overlay" id="xPostModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>X に投稿</h3>
+        <button class="modal-close" id="xPostModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="tweet-editor">
+          <textarea id="xPostTextarea" rows="5"></textarea>
+          <div class="tweet-footer">
+            <span class="char-count" id="xPostCharCount">0 / 280</span>
+          </div>
+        </div>
+        <div class="modal-status" id="xPostStatus"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="xPostCancel">キャンセル</button>
+        <button class="btn btn-x" id="xPostConfirm">今すぐ投稿</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="x-workflow.js"></script>
+</body>
+</html>

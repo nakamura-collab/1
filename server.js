@@ -1,8 +1,12 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk').default;
 const { TwitterApi } = require('twitter-api-v2');
 const cron = require('node-cron');
+
+// データディレクトリを起動時に作成
+fs.mkdirSync(path.join(__dirname, 'data', 'sessions'), { recursive: true });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -236,6 +240,235 @@ app.get('/api/x-status', (_req, res) => {
   res.json({
     xConfigured: !!createXClient(),
     claudeConfigured: !!createAnthropicClient(),
+  });
+});
+
+// ═════════════════════════════════════════════════════════════
+// X発信改善ワークフロー
+// ═════════════════════════════════════════════════════════════
+
+const PROMPTS_DIR = path.join(__dirname, 'prompts');
+const DATA_DIR = path.join(__dirname, 'data');
+const IMPROVEMENT_PATH = path.join(DATA_DIR, 'latest_improvement.md');
+
+function readPromptFile(filename) {
+  return fs.readFileSync(path.join(PROMPTS_DIR, filename), 'utf-8');
+}
+
+function getSessionPath(date) {
+  return path.join(DATA_DIR, 'sessions', `${date}.json`);
+}
+
+function loadSession(date) {
+  const p = getSessionPath(date);
+  if (!fs.existsSync(p)) return { date };
+  return JSON.parse(fs.readFileSync(p, 'utf-8'));
+}
+
+function saveSession(date, data) {
+  fs.writeFileSync(getSessionPath(date), JSON.stringify(data, null, 2));
+}
+
+function todayJST() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// SSE ヘルパー
+function sseSetup(res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+}
+
+function sseSend(res, data) {
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+// ── ワークフロー状態取得 ──────────────────────────────────────
+app.get('/api/workflow/status', (req, res) => {
+  const date = req.query.date || todayJST();
+  const session = loadSession(date);
+  res.json({
+    date,
+    hasImprovement: fs.existsSync(IMPROVEMENT_PATH),
+    hasGeneration: !!session.generation,
+    hasAnalysis: !!session.analysis,
+    hasImprovement_session: !!session.improvement,
+    session: {
+      date: session.date,
+      generatedAt: session.generation?.createdAt,
+      analyzedAt: session.analysis?.createdAt,
+      improvedAt: session.improvement?.createdAt,
+    },
+  });
+});
+
+// ── Step 1: 投稿案生成（SSE） ─────────────────────────────────
+app.post('/api/workflow/generate-posts', async (req, res) => {
+  const anthropic = createAnthropicClient();
+  if (!anthropic) return res.status(503).json({ error: 'ANTHROPIC_API_KEY が未設定です' });
+
+  sseSetup(res);
+
+  let prompt = readPromptFile('01_post_generation.md');
+
+  // 前回の改善ルールがあれば追加
+  if (fs.existsSync(IMPROVEMENT_PATH)) {
+    const improvement = fs.readFileSync(IMPROVEMENT_PATH, 'utf-8');
+    prompt += `\n\n---\n## 前回の改善ルール（必ず反映すること）\n\n${improvement}`;
+    sseSend(res, { type: 'info', message: '前回の改善ルールを読み込みました' });
+  }
+
+  let fullText = '';
+  try {
+    const stream = anthropic.messages.stream({
+      model: 'claude-opus-4-6',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        fullText += event.delta.text;
+        sseSend(res, { type: 'text', text: event.delta.text });
+      }
+    }
+
+    const date = todayJST();
+    const session = loadSession(date);
+    session.generation = { text: fullText, createdAt: new Date().toISOString() };
+    saveSession(date, session);
+
+    sseSend(res, { type: 'done', fullText, date });
+  } catch (err) {
+    sseSend(res, { type: 'error', error: err.message });
+  }
+  res.end();
+});
+
+// ── Step 2: 結果分析（SSE） ───────────────────────────────────
+app.post('/api/workflow/analyze-results', async (req, res) => {
+  const { metrics, date } = req.body; // metrics: [{body, category, postedAt, impressions, likes, ...}]
+  if (!metrics || !Array.isArray(metrics)) {
+    return res.status(400).json({ error: 'metricsが必要です' });
+  }
+
+  const anthropic = createAnthropicClient();
+  if (!anthropic) return res.status(503).json({ error: 'ANTHROPIC_API_KEY が未設定です' });
+
+  sseSetup(res);
+
+  const sessionDate = date || todayJST();
+  let prompt = readPromptFile('02_result_analysis.md');
+
+  // 投稿データをプロンプトに追加
+  prompt += '\n\n---\n## 分析対象の投稿データ\n';
+  metrics.forEach((m, i) => {
+    prompt += `
+投稿${i + 1}
+本文：${m.body || ''}
+カテゴリ：${m.category || ''}
+投稿時間：${m.postedAt || '未入力'}
+インプレッション：${m.impressions || 0}
+いいね数：${m.likes || 0}
+返信数：${m.replies || 0}
+リポスト数：${m.reposts || 0}
+ブックマーク数：${m.bookmarks || 0}
+プロフィール遷移数：${m.profileVisits || 0}
+フォロー増加：${m.newFollowers || 0}
+初速の反応：${m.initialResponse || '未入力'}
+補足コメント：${m.notes || 'なし'}
+`;
+  });
+
+  let fullText = '';
+  try {
+    const stream = anthropic.messages.stream({
+      model: 'claude-opus-4-6',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        fullText += event.delta.text;
+        sseSend(res, { type: 'text', text: event.delta.text });
+      }
+    }
+
+    const session = loadSession(sessionDate);
+    session.analysis = { text: fullText, metrics, createdAt: new Date().toISOString() };
+    saveSession(sessionDate, session);
+
+    sseSend(res, { type: 'done', fullText, date: sessionDate });
+  } catch (err) {
+    sseSend(res, { type: 'error', error: err.message });
+  }
+  res.end();
+});
+
+// ── Step 3: 改善ループ生成（SSE） ────────────────────────────
+app.post('/api/workflow/generate-improvement', async (req, res) => {
+  const { date } = req.body;
+  const sessionDate = date || todayJST();
+  const session = loadSession(sessionDate);
+
+  if (!session.analysis) {
+    return res.status(400).json({ error: '先に結果分析を実行してください' });
+  }
+
+  const anthropic = createAnthropicClient();
+  if (!anthropic) return res.status(503).json({ error: 'ANTHROPIC_API_KEY が未設定です' });
+
+  sseSetup(res);
+
+  let prompt = readPromptFile('03_improvement_loop.md');
+  prompt += `\n\n---\n## 今回の分析結果\n\n${session.analysis.text}`;
+
+  let fullText = '';
+  try {
+    const stream = anthropic.messages.stream({
+      model: 'claude-opus-4-6',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        fullText += event.delta.text;
+        sseSend(res, { type: 'text', text: event.delta.text });
+      }
+    }
+
+    session.improvement = { text: fullText, createdAt: new Date().toISOString() };
+    saveSession(sessionDate, session);
+
+    sseSend(res, { type: 'done', fullText, date: sessionDate });
+  } catch (err) {
+    sseSend(res, { type: 'error', error: err.message });
+  }
+  res.end();
+});
+
+// ── 改善ルールを次回用に保存 ──────────────────────────────────
+app.post('/api/workflow/save-improvement', (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'textが必要です' });
+  fs.writeFileSync(IMPROVEMENT_PATH, text);
+  res.json({ success: true });
+});
+
+// ── セッションデータ取得 ──────────────────────────────────────
+app.get('/api/workflow/session', (req, res) => {
+  const date = req.query.date || todayJST();
+  const session = loadSession(date);
+  // cronJob は JSON に含めない
+  res.json({
+    date: session.date,
+    generation: session.generation ? { text: session.generation.text, createdAt: session.generation.createdAt } : null,
+    analysis: session.analysis ? { text: session.analysis.text, metrics: session.analysis.metrics, createdAt: session.analysis.createdAt } : null,
+    improvement: session.improvement ? { text: session.improvement.text, createdAt: session.improvement.createdAt } : null,
   });
 });
 
