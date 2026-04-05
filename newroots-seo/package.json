@@ -1,0 +1,14 @@
+{
+  "name": "newroots-seo",
+  "version": "1.0.0",
+  "description": "newroots.co.jp SEO自動分析ツール",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "playwright": "^1.44.0"
+  }
+}
