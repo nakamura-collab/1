@@ -347,6 +347,258 @@ body {
   vertical-align: middle;
 }
 
+/* ========== X ボタン ========== */
+.btn-x {
+  background: #000;
+  color: var(--white);
+}
+
+.btn-x:hover {
+  background: #333;
+}
+
+.btn-x:disabled {
+  background: var(--gray-300);
+  cursor: not-allowed;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* ========== Modal ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.modal-header h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--gray-500);
+  line-height: 1;
+  padding: 0.25rem;
+}
+
+.modal-close:hover {
+  color: var(--gray-900);
+}
+
+.modal-body {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-hint {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+}
+
+.tweet-editor {
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tweet-editor textarea {
+  width: 100%;
+  border: none;
+  padding: 0.75rem;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.tweet-editor textarea:focus {
+  outline: none;
+}
+
+.tweet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: var(--gray-50);
+  border-top: 1px solid var(--gray-200);
+}
+
+.char-count {
+  font-size: 0.8125rem;
+  color: var(--gray-500);
+}
+
+.char-count.warn {
+  color: #d97706;
+}
+
+.char-count.over {
+  color: var(--red-500);
+  font-weight: 600;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.modal-status {
+  font-size: 0.875rem;
+  min-height: 1.25rem;
+  font-weight: 500;
+}
+
+.modal-status.success {
+  color: #16a34a;
+}
+
+.modal-status.error {
+  color: var(--red-500);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+.schedule-input {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.schedule-input label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  white-space: nowrap;
+}
+
+.schedule-input input[type="datetime-local"] {
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  padding: 0.375rem 0.625rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ========== Scheduled Posts ========== */
+.scheduled-section {
+  margin-top: 2rem;
+}
+
+.scheduled-post-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.scheduled-post-item:last-child {
+  border-bottom: none;
+}
+
+.scheduled-post-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.status-pending {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-posted {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-failed {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.scheduled-post-time {
+  font-size: 0.8125rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+
+.scheduled-post-text {
+  font-size: 0.875rem;
+  color: var(--gray-700);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-cancel {
+  background: var(--gray-100);
+  color: var(--red-500);
+  border: none;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.btn-cancel:hover {
+  background: #fee2e2;
+}
+
+.spinner-dark {
+  border-color: var(--gray-700);
+  border-top-color: transparent;
+}
+
 /* ========== Print ========== */
 @media print {
   .header,

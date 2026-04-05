@@ -102,13 +102,58 @@
       <section class="preview-section" id="previewSection" style="display:none;">
         <div class="preview-toolbar">
           <button class="btn btn-secondary" id="backBtn">入力に戻る</button>
-          <button class="btn btn-primary" id="downloadPdfBtn">PDFダウンロード</button>
+          <div class="toolbar-right">
+            <button class="btn btn-x" id="postToXBtn">X に投稿</button>
+            <button class="btn btn-primary" id="downloadPdfBtn">PDFダウンロード</button>
+          </div>
         </div>
         <div class="proposal-preview" id="proposalPreview">
           <!-- プレビュー内容はJSで動的に生成 -->
         </div>
       </section>
+
+      <!-- スケジュール投稿一覧 -->
+      <section class="scheduled-section" id="scheduledPostsSection" style="display:none;">
+        <div class="card">
+          <h2>スケジュール済み投稿</h2>
+          <div id="scheduledPostsList"></div>
+        </div>
+      </section>
     </main>
+  </div>
+
+  <!-- X 投稿モーダル -->
+  <div class="modal-overlay" id="xModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>X（Twitter）に投稿</h3>
+        <button class="modal-close" id="closeModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-hint">Claudeが提案内容をもとにツイートを生成しました。編集して投稿してください。</p>
+        <div class="tweet-editor">
+          <textarea id="tweetTextarea" rows="5" placeholder="ツイート内容を入力..."></textarea>
+          <div class="tweet-footer">
+            <span class="char-count" id="charCount">0 / 280</span>
+            <button class="btn btn-secondary btn-sm" id="generateTweetBtn">再生成</button>
+          </div>
+        </div>
+        <div id="modalStatus" class="modal-status"></div>
+
+        <!-- スケジュール投稿エリア -->
+        <div id="scheduleSection" style="display:none;">
+          <div class="schedule-input">
+            <label for="scheduledAt">投稿日時（日本時間）</label>
+            <input type="datetime-local" id="scheduledAt">
+            <button class="btn btn-primary btn-sm" id="confirmScheduleBtn">登録する</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="scheduleBtn">スケジュール投稿</button>
+        <button class="btn btn-x" id="postNowBtn">今すぐ投稿</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
