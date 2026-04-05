@@ -1,6 +1,16 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+
+// Claude Code 環境：undici ProxyAgent で SDK の HTTPS 通信をプロキシ経由にする
+if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) {
+  try {
+    const { setGlobalDispatcher, ProxyAgent } = require('undici');
+    const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+    setGlobalDispatcher(new ProxyAgent({ uri: proxyUrl }));
+  } catch (e) { /* undici 未インストール時はスキップ */ }
+}
+
 const Anthropic = require('@anthropic-ai/sdk').default;
 const { TwitterApi } = require('twitter-api-v2');
 const cron = require('node-cron');
@@ -25,8 +35,15 @@ function createXClient() {
 
 // ── Anthropic クライアント ────────────────────────────────────
 function createAnthropicClient() {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  return new Anthropic();
+  if (process.env.ANTHROPIC_API_KEY) return new Anthropic();
+  // Claude Code 環境では Bearer トークンで認証
+  const tokenFile = '/home/claude/.claude/remote/.session_ingress_token';
+  const fs2 = require('fs');
+  if (fs2.existsSync(tokenFile)) {
+    const authToken = fs2.readFileSync(tokenFile, 'utf-8').trim();
+    return new Anthropic({ authToken });
+  }
+  return null;
 }
 
 // ── スケジュール投稿ストア（メモリ） ─────────────────────────
