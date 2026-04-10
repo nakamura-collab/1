@@ -1,259 +1,198 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const { TwitterApi } = require('twitter-api-v2');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, 'posts.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 提案テンプレート定義
-const proposalTemplates = {
-  it_consulting: {
-    name: 'ITコンサルティング',
-    sections: ['現状分析', '課題の整理', '提案ソリューション', '導入スケジュール', '費用見積'],
-  },
-  system_development: {
-    name: 'システム開発',
-    sections: ['プロジェクト概要', '要件整理', 'システム構成', '開発スケジュール', '費用見積'],
-  },
-  digital_marketing: {
-    name: 'デジタルマーケティング',
-    sections: ['市場分析', '現状の課題', '施策提案', '実施スケジュール', '費用見積'],
-  },
-  cloud_migration: {
-    name: 'クラウド移行',
-    sections: ['現行インフラ分析', '移行計画', 'アーキテクチャ設計', '移行スケジュール', '費用見積'],
-  },
+// 認証情報（環境変数またはUIから設定）
+let credentials = {
+  apiKey: process.env.X_API_KEY || '',
+  apiSecret: process.env.X_API_SECRET || '',
+  accessToken: process.env.X_ACCESS_TOKEN || '',
+  accessSecret: process.env.X_ACCESS_SECRET || '',
 };
 
-// テンプレート一覧取得
-app.get('/api/templates', (_req, res) => {
-  const list = Object.entries(proposalTemplates).map(([id, t]) => ({
-    id,
-    name: t.name,
-    sections: t.sections,
-  }));
-  res.json(list);
+let posts = loadPosts();
+const scheduledTimers = {};
+
+function loadPosts() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('posts.json の読み込みに失敗:', e.message);
+  }
+  return [];
+}
+
+function savePosts() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(posts, null, 2));
+  } catch (e) {
+    console.error('posts.json の保存に失敗:', e.message);
+  }
+}
+
+function getTwitterClient() {
+  const { apiKey, apiSecret, accessToken, accessSecret } = credentials;
+  if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
+    throw new Error('X API の認証情報が設定されていません');
+  }
+  return new TwitterApi({
+    appKey: apiKey,
+    appSecret: apiSecret,
+    accessToken,
+    accessSecret,
+  });
+}
+
+async function postTweet(postId) {
+  const post = posts.find((p) => p.id === postId);
+  if (!post) return;
+
+  try {
+    const client = getTwitterClient();
+    const result = await client.v2.tweet(post.content);
+    post.status = 'posted';
+    post.postedAt = new Date().toISOString();
+    post.tweetId = result.data.id;
+    console.log(`[投稿成功] tweet_id=${post.tweetId}`);
+  } catch (e) {
+    post.status = 'failed';
+    post.error = e.message;
+    console.error(`[投稿失敗] ${e.message}`);
+  }
+
+  if (scheduledTimers[postId]) {
+    clearTimeout(scheduledTimers[postId]);
+    delete scheduledTimers[postId];
+  }
+  savePosts();
+}
+
+function schedulePost(post) {
+  if (post.status !== 'scheduled' || !post.scheduledAt) return;
+
+  const scheduledTime = new Date(post.scheduledAt);
+  const delay = scheduledTime - Date.now();
+
+  if (delay <= 0) {
+    postTweet(post.id);
+    return;
+  }
+
+  scheduledTimers[post.id] = setTimeout(() => postTweet(post.id), delay);
+  console.log(`[スケジュール設定] id=${post.id} 投稿予定=${post.scheduledAt}`);
+}
+
+// 起動時に pending スケジュール投稿を再スケジュール
+posts.filter((p) => p.status === 'scheduled').forEach(schedulePost);
+
+// ─── API ─────────────────────────────────────────────
+
+// 認証情報の確認
+app.get('/api/credentials/check', (_req, res) => {
+  const { apiKey, apiSecret, accessToken, accessSecret } = credentials;
+  res.json({ configured: !!(apiKey && apiSecret && accessToken && accessSecret) });
 });
 
-// 提案資料生成
-app.post('/api/generate', (req, res) => {
-  const { customer, templateId } = req.body;
-
-  if (!customer || !templateId) {
-    return res.status(400).json({ error: '顧客情報とテンプレートIDは必須です' });
+// 認証情報の保存
+app.post('/api/credentials', (req, res) => {
+  const { apiKey, apiSecret, accessToken, accessSecret } = req.body;
+  if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
+    return res.status(400).json({ error: '全ての認証情報を入力してください' });
   }
-
-  const template = proposalTemplates[templateId];
-  if (!template) {
-    return res.status(400).json({ error: '無効なテンプレートIDです' });
-  }
-
-  const proposal = generateProposal(customer, template, templateId);
-  res.json(proposal);
+  credentials = { apiKey, apiSecret, accessToken, accessSecret };
+  res.json({ success: true });
 });
 
-function generateProposal(customer, template, templateId) {
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
-
-  const sectionGenerators = {
-    it_consulting: generateITConsultingSections,
-    system_development: generateSystemDevSections,
-    digital_marketing: generateDigitalMarketingSections,
-    cloud_migration: generateCloudMigrationSections,
-  };
-
-  const generator = sectionGenerators[templateId];
-  const sections = generator(customer);
-
-  return {
-    title: `${customer.companyName} 様向け ${template.name}のご提案`,
-    date: dateStr,
-    customer: {
-      companyName: customer.companyName,
-      department: customer.department || '',
-      contactName: customer.contactName || '',
-      industry: customer.industry || '',
-      employeeCount: customer.employeeCount || '',
-    },
-    sections,
-  };
-}
-
-function generateITConsultingSections(c) {
-  return [
-    {
-      title: '現状分析',
-      content: `${c.companyName}様（${c.industry || '—'}業界、従業員${c.employeeCount || '—'}名規模）の現状のIT環境およびビジネスプロセスを分析いたしました。${c.challenges ? `\n\nお伺いした課題：\n${c.challenges}` : ''}`,
-    },
-    {
-      title: '課題の整理',
-      items: buildChallengeItems(c),
-    },
-    {
-      title: '提案ソリューション',
-      items: buildSolutionItems(c, 'it_consulting'),
-    },
-    {
-      title: '導入スケジュール',
-      content: buildSchedule(c, 'it_consulting'),
-    },
-    {
-      title: '費用見積',
-      content: buildCostEstimate(c, 'it_consulting'),
-    },
-  ];
-}
-
-function generateSystemDevSections(c) {
-  return [
-    {
-      title: 'プロジェクト概要',
-      content: `${c.companyName}様向け${c.projectName || 'システム開発'}プロジェクトについて、以下の通りご提案いたします。${c.challenges ? `\n\n背景・目的：\n${c.challenges}` : ''}`,
-    },
-    {
-      title: '要件整理',
-      items: buildChallengeItems(c),
-    },
-    {
-      title: 'システム構成',
-      items: buildSolutionItems(c, 'system_development'),
-    },
-    {
-      title: '開発スケジュール',
-      content: buildSchedule(c, 'system_development'),
-    },
-    {
-      title: '費用見積',
-      content: buildCostEstimate(c, 'system_development'),
-    },
-  ];
-}
-
-function generateDigitalMarketingSections(c) {
-  return [
-    {
-      title: '市場分析',
-      content: `${c.industry || '—'}業界における${c.companyName}様のデジタルマーケティング戦略について分析いたしました。${c.challenges ? `\n\n現状の課題：\n${c.challenges}` : ''}`,
-    },
-    {
-      title: '現状の課題',
-      items: buildChallengeItems(c),
-    },
-    {
-      title: '施策提案',
-      items: buildSolutionItems(c, 'digital_marketing'),
-    },
-    {
-      title: '実施スケジュール',
-      content: buildSchedule(c, 'digital_marketing'),
-    },
-    {
-      title: '費用見積',
-      content: buildCostEstimate(c, 'digital_marketing'),
-    },
-  ];
-}
-
-function generateCloudMigrationSections(c) {
-  return [
-    {
-      title: '現行インフラ分析',
-      content: `${c.companyName}様の現行インフラ環境を分析し、クラウド移行計画をご提案いたします。${c.challenges ? `\n\n移行の背景：\n${c.challenges}` : ''}`,
-    },
-    {
-      title: '移行計画',
-      items: buildChallengeItems(c),
-    },
-    {
-      title: 'アーキテクチャ設計',
-      items: buildSolutionItems(c, 'cloud_migration'),
-    },
-    {
-      title: '移行スケジュール',
-      content: buildSchedule(c, 'cloud_migration'),
-    },
-    {
-      title: '費用見積',
-      content: buildCostEstimate(c, 'cloud_migration'),
-    },
-  ];
-}
-
-function buildChallengeItems(c) {
-  const items = [];
-  if (c.challenges) {
-    c.challenges.split('\n').filter(Boolean).forEach((line) => {
-      items.push(line.replace(/^[-・●]?\s*/, ''));
-    });
+// 認証情報のテスト
+app.post('/api/credentials/test', async (_req, res) => {
+  try {
+    const client = getTwitterClient();
+    const me = await client.v2.me();
+    res.json({ success: true, username: me.data.username });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
-  if (c.budget) items.push(`予算規模: ${c.budget}`);
-  if (c.timeline) items.push(`希望納期: ${c.timeline}`);
-  if (items.length === 0) items.push('ヒアリングにて詳細を確認');
-  return items;
-}
+});
 
-function buildSolutionItems(_c, templateId) {
-  const solutions = {
-    it_consulting: [
-      '業務プロセスの可視化と最適化',
-      'IT基盤の刷新・モダナイゼーション',
-      'データ活用基盤の構築',
-      'セキュリティ対策の強化',
-    ],
-    system_development: [
-      'クラウドネイティブアーキテクチャの採用',
-      'マイクロサービス設計による拡張性確保',
-      'CI/CDパイプラインの構築',
-      'ユーザビリティを重視したUI/UX設計',
-    ],
-    digital_marketing: [
-      'SEO/SEM最適化施策',
-      'コンテンツマーケティング戦略の立案',
-      'SNSマーケティングの強化',
-      'データドリブンなPDCAサイクルの構築',
-    ],
-    cloud_migration: [
-      'リフト&シフトによる段階的移行',
-      'コンテナ化・Kubernetes基盤の構築',
-      'マネージドサービスの活用',
-      '監視・運用体制の整備',
-    ],
-  };
-  return solutions[templateId] || solutions.it_consulting;
-}
+// 投稿一覧取得
+app.get('/api/posts', (_req, res) => {
+  res.json([...posts].reverse());
+});
 
-function buildSchedule(_c, templateId) {
-  const schedules = {
-    it_consulting:
-      'フェーズ1（1〜2ヶ月目）: 現状調査・分析\nフェーズ2（3〜4ヶ月目）: 改善計画策定\nフェーズ3（5〜6ヶ月目）: 施策実行・効果測定',
-    system_development:
-      'フェーズ1（1ヶ月目）: 要件定義\nフェーズ2（2〜3ヶ月目）: 基本設計・詳細設計\nフェーズ3（4〜6ヶ月目）: 開発・単体テスト\nフェーズ4（7ヶ月目）: 結合テスト・UAT\nフェーズ5（8ヶ月目）: リリース・運用開始',
-    digital_marketing:
-      'フェーズ1（1ヶ月目）: 現状分析・戦略策定\nフェーズ2（2〜3ヶ月目）: 施策準備・コンテンツ制作\nフェーズ3（4〜6ヶ月目）: 施策実行・効果測定\nフェーズ4（7ヶ月目以降）: 継続改善・PDCA',
-    cloud_migration:
-      'フェーズ1（1ヶ月目）: アセスメント・計画策定\nフェーズ2（2〜3ヶ月目）: PoC・検証環境構築\nフェーズ3（4〜5ヶ月目）: 本番移行\nフェーズ4（6ヶ月目）: 最適化・運用安定化',
-  };
-  return schedules[templateId] || schedules.it_consulting;
-}
+// 投稿作成（即時 or スケジュール）
+app.post('/api/posts', async (req, res) => {
+  const { content, scheduledAt } = req.body;
 
-function buildCostEstimate(c, templateId) {
-  const base = {
-    it_consulting: { label: 'コンサルティング費用', range: '300万円〜800万円' },
-    system_development: { label: '開発費用', range: '500万円〜2,000万円' },
-    digital_marketing: { label: 'マーケティング施策費用', range: '200万円〜600万円' },
-    cloud_migration: { label: 'クラウド移行費用', range: '400万円〜1,500万円' },
-  };
-  const est = base[templateId] || base.it_consulting;
-  let text = `${est.label}（税別）: ${est.range}\n\n※ 詳細な見積もりは要件確定後にお出しいたします。`;
-  if (c.budget) {
-    text += `\n\nご予算: ${c.budget}\n上記ご予算を踏まえた最適なプランをご提案いたします。`;
+  if (!content || content.trim() === '') {
+    return res.status(400).json({ error: '投稿内容を入力してください' });
   }
-  return text;
-}
+  if (content.length > 280) {
+    return res.status(400).json({ error: '投稿内容は280文字以内にしてください' });
+  }
+
+  const post = {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    content: content.trim(),
+    createdAt: new Date().toISOString(),
+    scheduledAt: scheduledAt || null,
+    status: scheduledAt ? 'scheduled' : 'pending',
+    postedAt: null,
+    tweetId: null,
+    error: null,
+  };
+
+  posts.push(post);
+  savePosts();
+
+  if (scheduledAt) {
+    schedulePost(post);
+    return res.json(post);
+  }
+
+  // 即時投稿
+  try {
+    const client = getTwitterClient();
+    const result = await client.v2.tweet(post.content);
+    post.status = 'posted';
+    post.postedAt = new Date().toISOString();
+    post.tweetId = result.data.id;
+    savePosts();
+    res.json(post);
+  } catch (e) {
+    post.status = 'failed';
+    post.error = e.message;
+    savePosts();
+    res.status(500).json({ error: e.message, post });
+  }
+});
+
+// スケジュール投稿のキャンセル
+app.delete('/api/posts/:id', (req, res) => {
+  const post = posts.find((p) => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: '投稿が見つかりません' });
+  if (post.status !== 'scheduled') {
+    return res.status(400).json({ error: 'スケジュール済みの投稿のみキャンセルできます' });
+  }
+
+  if (scheduledTimers[post.id]) {
+    clearTimeout(scheduledTimers[post.id]);
+    delete scheduledTimers[post.id];
+  }
+  post.status = 'cancelled';
+  savePosts();
+  res.json({ success: true });
+});
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`X 自動投稿アプリ起動 → http://localhost:${PORT}`);
 });
